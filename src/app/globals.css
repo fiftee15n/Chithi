@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-main: #FAF7F2;
+    --paper-surface: #FFFEFC;
+    --ink-primary: #221C18;
+    --ink-muted: #6E6359;
+    --border-subtle: #E8DFD5;
+  }
+
+  body {
+    background-color: var(--bg-main);
+    color: var(--ink-primary);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-image: radial-gradient(rgba(112, 99, 87, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  ::selection {
+    background-color: #FCE7EB;
+    color: #7F1827;
+  }
+}
+
+/* Tactile Paper Textures & Effects */
+.paper-sheet {
+  background-color: #FFFEFC;
+  background-image: linear-gradient(to bottom, #FFFFFF, #FAF7F2);
+  border: 1px solid #EAE2D8;
+  box-shadow: 
+    0 1px 3px rgba(39, 33, 28, 0.04),
+    0 6px 16px -4px rgba(39, 33, 28, 0.06),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  position: relative;
+}
+
+.paper-sheet-cream {
+  background-color: #FBF7EE;
+  background-image: linear-gradient(to bottom, #FCF9F2, #F8F3E6);
+  border: 1px solid #E6DC melt#E4D9C8;
+  border-color: #E6DC melt#E4D9C8;
+  border-color: #E5DAC7;
+}
+
+.paper-sheet-sepia {
+  background-color: #F7F1E5;
+  background-image: linear-gradient(to bottom, #F9F5EC, #F2E9D8);
+  border-color: #DFD3BE;
+}
+
+.paper-sheet-rose {
+  background-color: #FAF4F4;
+  background-image: linear-gradient(to bottom, #FCF7F7, #F7ECEE);
+  border-color: #EBDADF;
+}
+
+/* Ruled Writing Paper */
+.paper-ruled {
+  background-color: #FFFEFC;
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 35px,
+    rgba(142, 127, 113, 0.12) 35px,
+    rgba(142, 127, 113, 0.12) 36px
+  );
+  line-height: 36px;
+}
+
+/* Post Stamp Motif */
+.stamp-border {
+  border: 2px dashed #D6C3B2;
+  border-radius: 4px;
+  background-color: #FFFDF9;
+}
+
+.wax-seal {
+  background: radial-gradient(circle at 35% 35%, #A02135, #6A101E);
+  box-shadow: 0 4px 10px rgba(106, 16, 30, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.4);
+}
+
+/* Smooth custom scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF7F2;
+}
+::-webkit-scrollbar-thumb {
+  background: #D6C3B2;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #AC8C73;
+}
