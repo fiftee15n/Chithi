@@ -34,7 +34,7 @@ import {
 } from '@/lib/storage';
 import { formatBengaliFullDate, formatBengaliRelativeDate, toBengaliNumber } from '@/lib/utils';
 
-const ADMIN_PASSCODE = 'chithi2026';
+const ADMIN_PASSCODE = process.env.NEXT_PUBLIC_ADMIN_PASSCODE || 'Tamal156@@';
 
 export default function AdminPortalPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -169,7 +169,7 @@ export default function AdminPortalPage() {
 
             {authError && (
               <p className="text-xs text-crimson-800 font-semibold animate-pulse">
-                পাসকোডটি সঠিক নয়। পুনরায় চেষ্টা করুন। (ডিফল্ট: chithi2026)
+                পাসকোডটি সঠিক নয়। পুনরায় সঠিক পাসকোড দিয়ে চেষ্টা করুন।
               </p>
             )}
 
