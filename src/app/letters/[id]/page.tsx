@@ -26,6 +26,8 @@ import {
   isLetterLiked,
   toggleLetterBookmark,
   isLetterBookmarked,
+  fetchLetterByIdOrCode,
+  syncRepliesForLetter,
 } from '@/lib/storage';
 import { formatBengaliFullDate, formatBengaliRelativeDate, toBengaliNumber } from '@/lib/utils';
 import ReportModal from '@/components/ReportModal';
@@ -56,15 +58,27 @@ export default function LetterDetailPage({ params }: { params: Promise<{ id: str
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
 
-  // Load letter and replies
-  const loadData = () => {
-    const found = getLetterById(letterId);
-    setLetter(found);
+  // Load letter and replies (supports Cloud Firestore + LocalStorage)
+  const loadData = async () => {
+    let found = getLetterById(letterId);
     if (found) {
+      setLetter(found);
       setLiked(isLetterLiked(found.id));
       setLikeCount(found.likes);
       setBookmarked(isLetterBookmarked(found.id));
       setReplies(getRepliesForLetter(found.id));
+      setLoading(false);
+    }
+
+    // Try cloud fetch if needed or to get latest updates
+    const cloudFound = await fetchLetterByIdOrCode(letterId);
+    if (cloudFound) {
+      setLetter(cloudFound);
+      setLiked(isLetterLiked(cloudFound.id));
+      setLikeCount(cloudFound.likes);
+      setBookmarked(isLetterBookmarked(cloudFound.id));
+      const cloudReplies = await syncRepliesForLetter(cloudFound.id);
+      setReplies(cloudReplies);
     }
     setLoading(false);
   };
@@ -72,8 +86,10 @@ export default function LetterDetailPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     loadData();
     window.addEventListener('chithi_replies_updated', loadData);
+    window.addEventListener('chithi_letters_updated', loadData);
     return () => {
       window.removeEventListener('chithi_replies_updated', loadData);
+      window.removeEventListener('chithi_letters_updated', loadData);
     };
   }, [letterId]);
 

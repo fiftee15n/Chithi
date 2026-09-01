@@ -58,8 +58,8 @@ export default function WriteLetterPage() {
 
   // Preview & Submission states
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [agreePublic, setAgreePublic] = useState(false);
-  const [agreeNoPII, setAgreeNoPII] = useState(false);
+  const [agreePublic, setAgreePublic] = useState(true);
+  const [agreeNoPII, setAgreeNoPII] = useState(true);
   const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [createdLetterId, setCreatedLetterId] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);

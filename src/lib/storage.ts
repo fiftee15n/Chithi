@@ -3,6 +3,21 @@
 import { Letter, LetterReply, LetterCategory, SortOption } from '@/types/letter';
 import { INITIAL_LETTERS, INITIAL_REPLIES } from './seedData';
 import { generateLetterCode, normalizeLetterCode } from './utils';
+import { db, isFirebaseConfigured } from './firebase';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  where,
+  increment,
+  onSnapshot,
+} from 'firebase/firestore';
 
 const STORAGE_KEYS = {
   LETTERS: 'chithi_letters_v2',
@@ -14,8 +29,11 @@ const STORAGE_KEYS = {
   REPORTS: 'chithi_reported_letters_v2',
 };
 
-// Check if window is defined (browser environment)
 const isBrowser = typeof window !== 'undefined';
+
+// -------------------------------------------------------------
+// LOCAL STORAGE LAYER (Synchronous for fast initial render)
+// -------------------------------------------------------------
 
 export function getStoredLetters(): Letter[] {
   if (!isBrowser) return INITIAL_LETTERS;
@@ -25,7 +43,8 @@ export function getStoredLetters(): Letter[] {
       localStorage.setItem(STORAGE_KEYS.LETTERS, JSON.stringify(INITIAL_LETTERS));
       return INITIAL_LETTERS;
     }
-    return JSON.parse(raw);
+    const parsed: Letter[] = JSON.parse(raw);
+    return parsed.length > 0 ? parsed : INITIAL_LETTERS;
   } catch (e) {
     console.error('Error reading letters from storage', e);
     return INITIAL_LETTERS;
@@ -67,22 +86,164 @@ export function saveReplies(replies: LetterReply[]): void {
   }
 }
 
-export function getLetterById(id: string): Letter | undefined {
+// -------------------------------------------------------------
+// HYBRID / FIRESTORE SYNC LAYER
+// -------------------------------------------------------------
+
+/**
+ * Fetch all letters from Firestore (if configured) and update local cache
+ */
+export async function syncLettersFromCloud(): Promise<Letter[]> {
+  if (!db || !isFirebaseConfigured) {
+    return getStoredLetters();
+  }
+
+  try {
+    const lettersRef = collection(db, 'letters');
+    const q = query(lettersRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const cloudLetters: Letter[] = snapshot.docs.map((docSnap) => ({
+        ...(docSnap.data() as Letter),
+        id: docSnap.id,
+      }));
+
+      // Merge with seed letters if cloud has only a few
+      const seenIds = new Set(cloudLetters.map((l) => l.id));
+      const combined = [...cloudLetters, ...INITIAL_LETTERS.filter((l) => !seenIds.has(l.id))];
+
+      saveLetters(combined);
+      return combined;
+    }
+  } catch (error) {
+    console.warn('Could not fetch letters from Firestore, using local cache:', error);
+  }
+
+  return getStoredLetters();
+}
+
+/**
+ * Fetch a single letter by ID or Code from Cloud or Local
+ */
+export async function fetchLetterByIdOrCode(idOrCode: string): Promise<Letter | undefined> {
+  const localFound = getLetterById(idOrCode);
+  if (localFound) return localFound;
+
+  if (!db || !isFirebaseConfigured || !idOrCode) {
+    return undefined;
+  }
+
+  let clean = idOrCode;
+  try {
+    clean = decodeURIComponent(idOrCode).trim();
+  } catch {
+    clean = idOrCode.trim();
+  }
+
+  try {
+    // 1. Try Firestore doc ID
+    const docRef = doc(db, 'letters', clean);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const letter = { ...(docSnap.data() as Letter), id: docSnap.id };
+      saveLetters([letter, ...getStoredLetters().filter((l) => l.id !== letter.id)]);
+      return letter;
+    }
+
+    // 2. Try query by code
+    const lettersRef = collection(db, 'letters');
+    const q = query(lettersRef, where('code', '==', clean));
+    const querySnap = await getDocs(q);
+    if (!querySnap.empty) {
+      const docData = querySnap.docs[0];
+      const letter = { ...(docData.data() as Letter), id: docData.id };
+      saveLetters([letter, ...getStoredLetters().filter((l) => l.id !== letter.id)]);
+      return letter;
+    }
+  } catch (error) {
+    console.warn('Error fetching letter from Firestore:', error);
+  }
+
+  return undefined;
+}
+
+/**
+ * Sync replies for a specific letter from Cloud
+ */
+export async function syncRepliesForLetter(letterId: string): Promise<LetterReply[]> {
+  if (!db || !isFirebaseConfigured || !letterId) {
+    return getRepliesForLetter(letterId);
+  }
+
+  try {
+    const repliesRef = collection(db, 'replies');
+    const q = query(repliesRef, where('letterId', '==', letterId));
+    const snapshot = await getDocs(q);
+
+    if (!snapshot.empty) {
+      const cloudReplies: LetterReply[] = snapshot.docs.map((docSnap) => ({
+        ...(docSnap.data() as LetterReply),
+        id: docSnap.id,
+      }));
+
+      const otherReplies = getStoredReplies().filter((r) => r.letterId !== letterId);
+      const all = [...otherReplies, ...cloudReplies];
+      saveReplies(all);
+      return cloudReplies.sort((a, b) => a.replyIndex - b.replyIndex);
+    }
+  } catch (error) {
+    console.warn('Error syncing replies from Firestore:', error);
+  }
+
+  return getRepliesForLetter(letterId);
+}
+
+// -------------------------------------------------------------
+// CORE READ & WRITE FUNCTIONS
+// -------------------------------------------------------------
+
+export function getLetterById(idOrCode: string): Letter | undefined {
+  if (!idOrCode) return undefined;
+  let clean = idOrCode;
+  try {
+    clean = decodeURIComponent(idOrCode).trim();
+  } catch {
+    clean = idOrCode.trim();
+  }
+
   const letters = getStoredLetters();
-  return letters.find((l) => l.id === id);
+  
+  // 1. Try exact or lowercase ID
+  const byId = letters.find(
+    (l) => l.id === clean || l.id.toLowerCase() === clean.toLowerCase()
+  );
+  if (byId) return byId;
+
+  // 2. Try by Code
+  return getLetterByCode(clean);
 }
 
 export function getLetterByCode(code: string): Letter | undefined {
+  if (!code) return undefined;
+  let clean = code;
+  try {
+    clean = decodeURIComponent(code).trim();
+  } catch {
+    clean = code.trim();
+  }
+
   const letters = getStoredLetters();
-  const searchNormalized = normalizeLetterCode(code);
-  const cleanCode = code.trim().toLowerCase();
+  const searchNormalized = normalizeLetterCode(clean);
+  const cleanLower = clean.toLowerCase();
   
   return letters.find((l) => {
     const letterNormalized = normalizeLetterCode(l.code);
     return (
-      l.code.toLowerCase() === cleanCode ||
+      l.code.toLowerCase() === cleanLower ||
+      l.id.toLowerCase() === cleanLower ||
       letterNormalized === searchNormalized ||
-      letterNormalized.endsWith(searchNormalized)
+      (searchNormalized.length > 0 && letterNormalized.endsWith(searchNormalized))
     );
   });
 }
@@ -111,9 +272,14 @@ export function createLetter(letterData: Omit<Letter, 'id' | 'code' | 'createdAt
 
   const updatedLetters = [newLetter, ...letters];
   saveLetters(updatedLetters);
-
-  // Save to authored codes
   saveMyLetterCode(newCode);
+
+  // Async save to Cloud Firestore if connected
+  if (db && isFirebaseConfigured) {
+    setDoc(doc(db, 'letters', newId), newLetter).catch((err) => {
+      console.error('Failed to save letter to Firestore:', err);
+    });
+  }
 
   return newLetter;
 }
@@ -144,6 +310,16 @@ export function createReply(letterId: string, replyData: Omit<LetterReply, 'id' 
     return l;
   });
   saveLetters(updatedLetters);
+
+  // Async save to Cloud Firestore if connected
+  if (db && isFirebaseConfigured) {
+    setDoc(doc(db, 'replies', newId), newReply).catch((err) => {
+      console.error('Failed to save reply to Firestore:', err);
+    });
+    updateDoc(doc(db, 'letters', letterId), {
+      replyCount: increment(1),
+    }).catch(() => {});
+  }
 
   return newReply;
 }
@@ -213,6 +389,13 @@ export function toggleLetterLike(letterId: string): { isLiked: boolean; count: n
   });
   saveLetters(updatedLetters);
 
+  // Async sync with Cloud Firestore
+  if (db && isFirebaseConfigured) {
+    updateDoc(doc(db, 'letters', letterId), {
+      likes: increment(isAlreadyLiked ? -1 : 1),
+    }).catch(() => {});
+  }
+
   return { isLiked: !isAlreadyLiked, count: updatedCount };
 }
 
@@ -264,6 +447,12 @@ export function reportLetter(letterId: string, reason: string): void {
     return l;
   });
   saveLetters(updatedLetters);
+
+  if (db && isFirebaseConfigured) {
+    updateDoc(doc(db, 'letters', letterId), {
+      isReported: true,
+    }).catch(() => {});
+  }
 }
 
 export function deleteLetter(letterId: string, code: string): boolean {
@@ -291,6 +480,10 @@ export function deleteLetter(letterId: string, code: string): boolean {
     );
     localStorage.setItem(STORAGE_KEYS.MY_CODES, JSON.stringify(myCodes));
     window.dispatchEvent(new CustomEvent('chithi_my_codes_updated'));
+  }
+
+  if (db && isFirebaseConfigured) {
+    deleteDoc(doc(db, 'letters', letterId)).catch(() => {});
   }
 
   return true;

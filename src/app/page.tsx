@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { PenTool, Mail, Heart, Sparkles, BookOpen, Search } from 'lucide-react';
 import { Letter, LetterCategory, SortOption } from '@/types/letter';
-import { getStoredLetters, filterLetters } from '@/lib/storage';
+import { getStoredLetters, filterLetters, syncLettersFromCloud } from '@/lib/storage';
 import LetterCard from '@/components/LetterCard';
 import DailyLetterCard from '@/components/DailyLetterCard';
 import LetterFilterBar from '@/components/LetterFilterBar';
@@ -21,15 +21,23 @@ export default function HomePage() {
   const [shareLetter, setShareLetter] = useState<Letter | null>(null);
 
   // Sync state
-  const refreshLetters = () => {
+  const refreshLetters = async () => {
     setLetters(getStoredLetters());
+    const cloudLetters = await syncLettersFromCloud();
+    if (cloudLetters && cloudLetters.length > 0) {
+      setLetters(cloudLetters);
+    }
   };
 
   useEffect(() => {
     refreshLetters();
     window.addEventListener('chithi_letters_updated', refreshLetters);
+    window.addEventListener('focus', refreshLetters);
+    document.addEventListener('visibilitychange', refreshLetters);
     return () => {
       window.removeEventListener('chithi_letters_updated', refreshLetters);
+      window.removeEventListener('focus', refreshLetters);
+      document.removeEventListener('visibilitychange', refreshLetters);
     };
   }, []);
 

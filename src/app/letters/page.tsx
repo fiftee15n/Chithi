@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Mail, PenTool, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { Letter, LetterCategory, SortOption } from '@/types/letter';
-import { getStoredLetters, filterLetters } from '@/lib/storage';
+import { getStoredLetters, filterLetters, syncLettersFromCloud } from '@/lib/storage';
 import LetterCard from '@/components/LetterCard';
 import LetterFilterBar from '@/components/LetterFilterBar';
 import SearchBar from '@/components/SearchBar';
@@ -19,15 +19,23 @@ export default function AllLettersPage() {
   const [isRandomOpen, setIsRandomOpen] = useState(false);
   const [shareLetter, setShareLetter] = useState<Letter | null>(null);
 
-  const refreshLetters = () => {
+  const refreshLetters = async () => {
     setLetters(getStoredLetters());
+    const cloudLetters = await syncLettersFromCloud();
+    if (cloudLetters && cloudLetters.length > 0) {
+      setLetters(cloudLetters);
+    }
   };
 
   useEffect(() => {
     refreshLetters();
     window.addEventListener('chithi_letters_updated', refreshLetters);
+    window.addEventListener('focus', refreshLetters);
+    document.addEventListener('visibilitychange', refreshLetters);
     return () => {
       window.removeEventListener('chithi_letters_updated', refreshLetters);
+      window.removeEventListener('focus', refreshLetters);
+      document.removeEventListener('visibilitychange', refreshLetters);
     };
   }, []);
 
