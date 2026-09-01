@@ -1,6 +1,6 @@
 'use client';
 
-import { Letter, LetterReply, LetterCategory, SortOption, ReportItem } from '@/types/letter';
+import { Letter, LetterReply, LetterCategory, SortOption, ReportItem, SiteAnalytics } from '@/types/letter';
 import { INITIAL_LETTERS, INITIAL_REPLIES } from './seedData';
 import { generateLetterCode, normalizeLetterCode } from './utils';
 import { db, isFirebaseConfigured } from './firebase';
@@ -653,3 +653,137 @@ export function filterLetters(
 
   return result;
 }
+
+// -------------------------------------------------------------
+// VISITOR ANALYTICS LAYER
+// -------------------------------------------------------------
+
+const ANALYTICS_KEYS = {
+  VISITOR_ID: 'chithi_visitor_id',
+  TODAY_VISITED: 'chithi_visited_date',
+  SESSION_PAGES: 'chithi_session_pages',
+};
+
+export function trackPageView(pathname: string): void {
+  if (!isBrowser) return;
+
+  // Don't track admin pages to avoid skewing user metrics
+  if (pathname.startsWith('/admin')) return;
+
+  try {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    let visitorId = localStorage.getItem(ANALYTICS_KEYS.VISITOR_ID);
+    const isNewUniqueVisitor = !visitorId;
+
+    if (!visitorId) {
+      visitorId = `v_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      localStorage.setItem(ANALYTICS_KEYS.VISITOR_ID, visitorId);
+    }
+
+    const lastVisitedDate = localStorage.getItem(ANALYTICS_KEYS.TODAY_VISITED);
+    const isNewTodayVisitor = lastVisitedDate !== today;
+    if (isNewTodayVisitor) {
+      localStorage.setItem(ANALYTICS_KEYS.TODAY_VISITED, today);
+    }
+
+    const isLetterRead = pathname.startsWith('/letters/');
+
+    if (db && isFirebaseConfigured) {
+      const globalStatsRef = doc(db, 'analytics', 'global');
+      const dailyStatsRef = doc(db, 'analytics', `daily_${today}`);
+
+      // Update Global Aggregates
+      setDoc(
+        globalStatsRef,
+        {
+          totalPageViews: increment(1),
+          ...(isNewUniqueVisitor ? { totalUniqueVisitors: increment(1) } : {}),
+          ...(isLetterRead ? { totalLettersRead: increment(1) } : {}),
+          lastUpdated: new Date().toISOString(),
+        },
+        { merge: true }
+      ).catch(() => {});
+
+      // Update Today's Aggregates
+      setDoc(
+        dailyStatsRef,
+        {
+          date: today,
+          pageViews: increment(1),
+          ...(isNewTodayVisitor ? { uniqueVisitors: increment(1) } : {}),
+          ...(isLetterRead ? { letterReads: increment(1) } : {}),
+        },
+        { merge: true }
+      ).catch(() => {});
+    }
+  } catch (error) {
+    console.warn('Analytics tracking error:', error);
+  }
+}
+
+export async function fetchSiteAnalytics(): Promise<SiteAnalytics> {
+  const defaultAnalytics: SiteAnalytics = {
+    totalPageViews: 0,
+    totalUniqueVisitors: 0,
+    todayPageViews: 0,
+    todayUniqueVisitors: 0,
+    totalLettersRead: 0,
+    dailyStats: [],
+  };
+
+  if (!db || !isFirebaseConfigured) {
+    return defaultAnalytics;
+  }
+
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const globalDocRef = doc(db, 'analytics', 'global');
+    const todayDocRef = doc(db, 'analytics', `daily_${today}`);
+
+    const [globalSnap, todaySnap] = await Promise.all([
+      getDoc(globalDocRef),
+      getDoc(todayDocRef),
+    ]);
+
+    const globalData = globalSnap.exists() ? globalSnap.data() : {};
+    const todayData = todaySnap.exists() ? todaySnap.data() : {};
+
+    // Also fetch last 7 days history
+    const dailyStats: { date: string; views: number; visitors: number }[] = [];
+    const now = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      try {
+        const dSnap = await getDoc(doc(db, 'analytics', `daily_${dateStr}`));
+        if (dSnap.exists()) {
+          const data = dSnap.data();
+          dailyStats.push({
+            date: dateStr,
+            views: data.pageViews || 0,
+            visitors: data.uniqueVisitors || 0,
+          });
+        } else {
+          dailyStats.push({ date: dateStr, views: 0, visitors: 0 });
+        }
+      } catch {
+        dailyStats.push({ date: dateStr, views: 0, visitors: 0 });
+      }
+    }
+
+    return {
+      totalPageViews: globalData.totalPageViews || 0,
+      totalUniqueVisitors: globalData.totalUniqueVisitors || 0,
+      todayPageViews: todayData.pageViews || 0,
+      todayUniqueVisitors: todayData.uniqueVisitors || 0,
+      totalLettersRead: globalData.totalLettersRead || 0,
+      lastUpdated: globalData.lastUpdated,
+      dailyStats,
+    };
+  } catch (error) {
+    console.warn('Error fetching analytics:', error);
+    return defaultAnalytics;
+  }
+}
+

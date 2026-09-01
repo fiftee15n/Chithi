@@ -3,6 +3,7 @@ import { Noto_Serif_Bengali, Hind_Siliguri } from 'next/font/google';
 import './globals.css';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import VisitorTracker from '@/components/VisitorTracker';
 import MobileBottomNav from '@/components/MobileBottomNav';
 
 const serifBengali = Noto_Serif_Bengali({
@@ -55,6 +56,7 @@ export default function RootLayout({
   return (
     <html lang="bn" className={`${serifBengali.variable} ${sansBengali.variable}`}>
       <body className="font-sans antialiased bg-paper-50 text-ink-900 flex flex-col min-h-screen selection:bg-crimson-100 selection:text-crimson-900">
+        <VisitorTracker />
         <Navbar />
         <main className="flex-1 pb-20 md:pb-12">
           {children}

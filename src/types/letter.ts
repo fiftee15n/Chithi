@@ -72,6 +72,16 @@ export interface LetterReply {
   likes: number;
 }
 
+export interface SiteAnalytics {
+  totalPageViews: number;
+  totalUniqueVisitors: number;
+  todayPageViews: number;
+  todayUniqueVisitors: number;
+  totalLettersRead: number;
+  lastUpdated?: string;
+  dailyStats?: { date: string; views: number; visitors: number }[];
+}
+
 export interface PIIDetectionResult {
   hasPII: boolean;
   warnings: string[];
