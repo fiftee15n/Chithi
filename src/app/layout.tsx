@@ -20,6 +20,9 @@ const sansBengali = Hind_Siliguri({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || 'https://chithi-likhun-seven.vercel.app'
+  ),
   title: 'চিঠি — একটি Anonymous Bangla Letter Platform',
   description: 'যে কথাগুলো বলা হয়নি, সেগুলো চিঠিতে থাক। সম্পূর্ণ অজ্ঞাতনামা বা ছদ্মনামে বাংলায় না-বলা কথার ডিজিটাল প্ল্যাটফর্ম।',
   keywords: ['চিঠি', 'Chithi', 'Bangla Letter', 'Anonymous Bangla', 'মনের কথা', 'বাংলা সাহিত্য', 'না বলা কথা'],
@@ -27,6 +30,11 @@ export const metadata: Metadata = {
     title: 'চিঠি — বলা হয়নি এমন কথার ঠিকানা',
     description: 'কিছু কথা নামহীন থাকলেই হয়তো বেশি সুন্দর। আপনার না-বলা দীর্ঘশ্বাস আর অনুভূতির গল্পগুলো নির্দ্বিধায় রেখে যান চিঠির ভাঁজে।',
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'চিঠি — বলা হয়নি এমন কথার ঠিকানা',
+    description: 'কিছু কথা নামহীন থাকলেই হয়তো বেশি সুন্দর। আপনার না-বলা দীর্ঘশ্বাস আর অনুভূতির গল্পগুলো নির্দ্বিধায় রেখে যান চিঠির ভাঁজে।',
   },
 };
 
