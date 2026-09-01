@@ -35,6 +35,10 @@ export default function Footer() {
           <Link href="/about" className="hover:text-crimson-800 transition-colors">
             চিঠি কেন?
           </Link>
+          <span className="text-paper-300">•</span>
+          <Link href="/admin" className="text-ink-400 hover:text-crimson-800 transition-colors" title="মডারেশন প্যানেল">
+            🔒 নিয়ন্ত্রণ
+          </Link>
         </div>
       </div>
 

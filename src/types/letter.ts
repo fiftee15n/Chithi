@@ -45,6 +45,20 @@ export interface Letter {
   paperColor?: 'white' | 'cream' | 'sepia' | 'rose';
   isReported?: boolean;
   reportReasons?: string[];
+  reportCount?: number;
+  isHidden?: boolean;
+}
+
+export interface ReportItem {
+  id: string;
+  letterId: string;
+  letterCode?: string;
+  recipient?: string;
+  letterBody?: string;
+  senderName?: string;
+  reason: string;
+  reportedAt: string;
+  status: 'pending' | 'resolved' | 'dismissed';
 }
 
 export interface LetterReply {
@@ -62,3 +76,4 @@ export interface PIIDetectionResult {
   hasPII: boolean;
   warnings: string[];
 }
+

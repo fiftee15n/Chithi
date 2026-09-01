@@ -1,6 +1,6 @@
 'use client';
 
-import { Letter, LetterReply, LetterCategory, SortOption } from '@/types/letter';
+import { Letter, LetterReply, LetterCategory, SortOption, ReportItem } from '@/types/letter';
 import { INITIAL_LETTERS, INITIAL_REPLIES } from './seedData';
 import { generateLetterCode, normalizeLetterCode } from './utils';
 import { db, isFirebaseConfigured } from './firebase';
@@ -16,7 +16,6 @@ import {
   orderBy,
   where,
   increment,
-  onSnapshot,
 } from 'firebase/firestore';
 
 const STORAGE_KEYS = {
@@ -32,7 +31,7 @@ const STORAGE_KEYS = {
 const isBrowser = typeof window !== 'undefined';
 
 // -------------------------------------------------------------
-// LOCAL STORAGE LAYER (Synchronous for fast initial render)
+// LOCAL STORAGE LAYER (Fast initial load & optimistic cache)
 // -------------------------------------------------------------
 
 export function getStoredLetters(): Letter[] {
@@ -86,13 +85,30 @@ export function saveReplies(replies: LetterReply[]): void {
   }
 }
 
+export function getStoredReports(): ReportItem[] {
+  if (!isBrowser) return [];
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.REPORTS);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveReports(reports: ReportItem[]): void {
+  if (!isBrowser) return;
+  try {
+    localStorage.setItem(STORAGE_KEYS.REPORTS, JSON.stringify(reports));
+    window.dispatchEvent(new CustomEvent('chithi_reports_updated'));
+  } catch (e) {
+    console.error('Error saving reports', e);
+  }
+}
+
 // -------------------------------------------------------------
 // HYBRID / FIRESTORE SYNC LAYER
 // -------------------------------------------------------------
 
-/**
- * Fetch all letters from Firestore (if configured) and update local cache
- */
 export async function syncLettersFromCloud(): Promise<Letter[]> {
   if (!db || !isFirebaseConfigured) {
     return getStoredLetters();
@@ -109,7 +125,6 @@ export async function syncLettersFromCloud(): Promise<Letter[]> {
         id: docSnap.id,
       }));
 
-      // Merge with seed letters if cloud has only a few
       const seenIds = new Set(cloudLetters.map((l) => l.id));
       const combined = [...cloudLetters, ...INITIAL_LETTERS.filter((l) => !seenIds.has(l.id))];
 
@@ -123,9 +138,6 @@ export async function syncLettersFromCloud(): Promise<Letter[]> {
   return getStoredLetters();
 }
 
-/**
- * Fetch a single letter by ID or Code from Cloud or Local
- */
 export async function fetchLetterByIdOrCode(idOrCode: string): Promise<Letter | undefined> {
   const localFound = getLetterById(idOrCode);
   if (localFound) return localFound;
@@ -142,7 +154,6 @@ export async function fetchLetterByIdOrCode(idOrCode: string): Promise<Letter | 
   }
 
   try {
-    // 1. Try Firestore doc ID
     const docRef = doc(db, 'letters', clean);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
@@ -151,7 +162,6 @@ export async function fetchLetterByIdOrCode(idOrCode: string): Promise<Letter | 
       return letter;
     }
 
-    // 2. Try query by code
     const lettersRef = collection(db, 'letters');
     const q = query(lettersRef, where('code', '==', clean));
     const querySnap = await getDocs(q);
@@ -168,9 +178,6 @@ export async function fetchLetterByIdOrCode(idOrCode: string): Promise<Letter | 
   return undefined;
 }
 
-/**
- * Sync replies for a specific letter from Cloud
- */
 export async function syncRepliesForLetter(letterId: string): Promise<LetterReply[]> {
   if (!db || !isFirebaseConfigured || !letterId) {
     return getRepliesForLetter(letterId);
@@ -214,13 +221,11 @@ export function getLetterById(idOrCode: string): Letter | undefined {
 
   const letters = getStoredLetters();
   
-  // 1. Try exact or lowercase ID
   const byId = letters.find(
     (l) => l.id === clean || l.id.toLowerCase() === clean.toLowerCase()
   );
   if (byId) return byId;
 
-  // 2. Try by Code
   return getLetterByCode(clean);
 }
 
@@ -268,13 +273,14 @@ export function createLetter(letterData: Omit<Letter, 'id' | 'code' | 'createdAt
     likes: 0,
     replyCount: 0,
     paperColor: letterData.paperColor || 'cream',
+    isHidden: false,
+    isReported: false,
   };
 
   const updatedLetters = [newLetter, ...letters];
   saveLetters(updatedLetters);
   saveMyLetterCode(newCode);
 
-  // Async save to Cloud Firestore if connected
   if (db && isFirebaseConfigured) {
     setDoc(doc(db, 'letters', newId), newLetter).catch((err) => {
       console.error('Failed to save letter to Firestore:', err);
@@ -301,7 +307,6 @@ export function createReply(letterId: string, replyData: Omit<LetterReply, 'id' 
   const allReplies = [...getStoredReplies(), newReply];
   saveReplies(allReplies);
 
-  // Update reply count on parent letter
   const letters = getStoredLetters();
   const updatedLetters = letters.map((l) => {
     if (l.id === letterId) {
@@ -311,7 +316,6 @@ export function createReply(letterId: string, replyData: Omit<LetterReply, 'id' 
   });
   saveLetters(updatedLetters);
 
-  // Async save to Cloud Firestore if connected
   if (db && isFirebaseConfigured) {
     setDoc(doc(db, 'replies', newId), newReply).catch((err) => {
       console.error('Failed to save reply to Firestore:', err);
@@ -389,7 +393,6 @@ export function toggleLetterLike(letterId: string): { isLiked: boolean; count: n
   });
   saveLetters(updatedLetters);
 
-  // Async sync with Cloud Firestore
   if (db && isFirebaseConfigured) {
     updateDoc(doc(db, 'letters', letterId), {
       likes: increment(isAlreadyLiked ? -1 : 1),
@@ -432,15 +435,37 @@ export function getBookmarkedLetters(): Letter[] {
   return letters.filter((l) => ids.includes(l.id));
 }
 
+// -------------------------------------------------------------
+// REPORTING & MODERATION LAYER
+// -------------------------------------------------------------
+
 export function reportLetter(letterId: string, reason: string): void {
-  if (!isBrowser) return;
   const letters = getStoredLetters();
+  const letter = letters.find((l) => l.id === letterId);
+
+  const newReport: ReportItem = {
+    id: `report-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    letterId,
+    letterCode: letter?.code || '',
+    recipient: letter?.recipient || '',
+    letterBody: letter?.body || '',
+    senderName: letter?.senderName || '',
+    reason,
+    reportedAt: new Date().toISOString(),
+    status: 'pending',
+  };
+
+  const existingReports = getStoredReports();
+  saveReports([newReport, ...existingReports]);
+
   const updatedLetters = letters.map((l) => {
     if (l.id === letterId) {
       const reasons = l.reportReasons || [];
+      const currentCount = l.reportCount || 0;
       return {
         ...l,
         isReported: true,
+        reportCount: currentCount + 1,
         reportReasons: [...reasons, reason],
       };
     }
@@ -449,9 +474,102 @@ export function reportLetter(letterId: string, reason: string): void {
   saveLetters(updatedLetters);
 
   if (db && isFirebaseConfigured) {
+    setDoc(doc(db, 'reports', newReport.id), newReport).catch((e) => {
+      console.warn('Error saving report to Firestore:', e);
+    });
     updateDoc(doc(db, 'letters', letterId), {
       isReported: true,
+      reportCount: increment(1),
     }).catch(() => {});
+  }
+}
+
+export async function fetchReportsFromCloud(): Promise<ReportItem[]> {
+  if (!db || !isFirebaseConfigured) {
+    return getStoredReports();
+  }
+
+  try {
+    const reportsRef = collection(db, 'reports');
+    const q = query(reportsRef, orderBy('reportedAt', 'desc'));
+    const snap = await getDocs(q);
+
+    if (!snap.empty) {
+      const cloudReports: ReportItem[] = snap.docs.map((d) => ({
+        ...(d.data() as ReportItem),
+        id: d.id,
+      }));
+      saveReports(cloudReports);
+      return cloudReports;
+    }
+  } catch (error) {
+    console.warn('Error fetching reports from Firestore:', error);
+  }
+
+  return getStoredReports();
+}
+
+export async function dismissReport(reportId: string, letterId: string): Promise<void> {
+  const reports = getStoredReports().map((r) => {
+    if (r.id === reportId) {
+      return { ...r, status: 'dismissed' as const };
+    }
+    return r;
+  });
+  saveReports(reports);
+
+  if (db && isFirebaseConfigured) {
+    updateDoc(doc(db, 'reports', reportId), { status: 'dismissed' }).catch(() => {});
+  }
+}
+
+export async function toggleHideLetterByAdmin(letterId: string, isHidden: boolean): Promise<void> {
+  const letters = getStoredLetters().map((l) => {
+    if (l.id === letterId) {
+      return { ...l, isHidden };
+    }
+    return l;
+  });
+  saveLetters(letters);
+
+  if (db && isFirebaseConfigured) {
+    updateDoc(doc(db, 'letters', letterId), { isHidden }).catch(() => {});
+  }
+}
+
+export async function deleteLetterByAdmin(letterId: string): Promise<void> {
+  const letters = getStoredLetters().filter((l) => l.id !== letterId);
+  saveLetters(letters);
+
+  const reports = getStoredReports().map((r) => {
+    if (r.letterId === letterId) {
+      return { ...r, status: 'resolved' as const };
+    }
+    return r;
+  });
+  saveReports(reports);
+
+  if (db && isFirebaseConfigured) {
+    deleteDoc(doc(db, 'letters', letterId)).catch(() => {});
+  }
+}
+
+export async function setDailyFeaturedLetter(letterId: string): Promise<void> {
+  const letters = getStoredLetters().map((l) => ({
+    ...l,
+    isDailyFeatured: l.id === letterId,
+  }));
+  saveLetters(letters);
+
+  if (db && isFirebaseConfigured) {
+    const firestore = db;
+    const lettersRef = collection(firestore, 'letters');
+    const snap = await getDocs(lettersRef);
+    snap.docs.forEach((d) => {
+      updateDoc(doc(firestore, 'letters', d.id), {
+        isDailyFeatured: d.id === letterId,
+      }).catch(() => {});
+    });
   }
 }
 
@@ -473,7 +591,6 @@ export function deleteLetter(letterId: string, code: string): boolean {
   const updatedLetters = letters.filter((l) => l.id !== letterId);
   saveLetters(updatedLetters);
 
-  // Remove from my codes
   if (isBrowser) {
     const myCodes = getMyLetterCodes().filter(
       (c) => normalizeLetterCode(c) !== inputNormalized
@@ -493,9 +610,15 @@ export function filterLetters(
   letters: Letter[],
   category: LetterCategory,
   sort: SortOption,
-  searchQuery: string = ''
+  searchQuery: string = '',
+  includeHidden: boolean = false
 ): Letter[] {
   let result = [...letters];
+
+  // Exclude hidden letters from public feeds unless requested by admin
+  if (!includeHidden) {
+    result = result.filter((l) => !l.isHidden);
+  }
 
   // Category filter
   if (category !== 'সব') {
