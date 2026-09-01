@@ -46,7 +46,7 @@ export default function HomePage() {
         </h1>
 
         <p className="text-ink-600 text-sm sm:text-base max-w-xl mx-auto font-sans leading-relaxed mb-8">
-          আপনার না-বলা কথাগুলো একটি চিঠিতে রেখে যান। নাম প্রকাশ করবেন কি না, সিদ্ধান্ত একান্তই আপনার।
+          কিছু কথা নামহীন থাকলেই হয়তো বেশি সুন্দর। আপনার না-বলা দীর্ঘশ্বাস আর অনুভূতির গল্পগুলো নির্দ্বিধায় রেখে যান চিঠির ভাঁজে।
         </p>
 
         {/* Primary CTA buttons */}
