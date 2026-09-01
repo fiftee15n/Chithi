@@ -88,6 +88,35 @@ export default function AboutPage() {
         </div>
       </div>
 
+      {/* Postal Messenger / Piyon Note */}
+      <div className="p-6 sm:p-8 rounded-2xl bg-paper-100/80 border border-paper-300 shadow-paper-sm mb-12 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-crimson-900 text-paper-50 flex items-center justify-center text-xl shadow-wax flex-shrink-0">
+            📮
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-serif font-bold text-crimson-900 bg-crimson-100/70 px-2 py-0.5 rounded">
+                চিঠির পিয়ন (Piyon)
+              </span>
+              <span className="text-xs font-serif italic text-ink-500">ডাকঘরের কারিগর</span>
+            </div>
+            <p className="font-serif text-sm sm:text-base text-ink-900 font-medium mt-1">
+              ডিজিটাল যুগেও মানুষের না-বলা কথাগুলোকে অক্ষরের ঠিকানায় নিরাপদে বাঁচিয়ে রাখার এক নিভৃত প্রয়াস।
+            </p>
+          </div>
+        </div>
+        <a
+          href="https://www.facebook.com/tamal.ehmad15/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-xs font-serif font-semibold px-4 py-2 rounded-full bg-white border border-paper-300 text-ink-900 hover:text-crimson-900 hover:border-crimson-300 shadow-paper-sm transition-all self-end sm:self-center flex-shrink-0"
+        >
+          <span>ডাকহরকরা: জাহাঙ্গীর আলম তমাল</span>
+          <span className="text-crimson-700">↗</span>
+        </a>
+      </div>
+
       {/* CTA Box */}
       <div className="text-center p-8 sm:p-10 rounded-2xl bg-gradient-to-br from-paper-100 to-sepia-50 border border-paper-300 shadow-paper">
         <h2 className="font-serif font-bold text-2xl text-ink-950 mb-2">

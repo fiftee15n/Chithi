@@ -40,9 +40,23 @@ export default function Footer() {
 
       <div className="max-w-5xl mx-auto mt-8 pt-6 border-t border-paper-200/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-ink-500">
         <p>© ২০২৬ চিঠি — একটি নিরাপদ ও মুক্ত বাংলা প্ল্যাটফর্ম।</p>
-        <p className="flex items-center gap-1">
-          হৃদয় থেকে লেখা প্রতিটি চিঠির জন্য <Heart className="w-3.5 h-3.5 text-crimson-700 fill-crimson-700 inline" />
-        </p>
+        <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5">
+          <a
+            href="https://www.facebook.com/tamal.ehmad15/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-crimson-800 transition-colors font-serif"
+          >
+            <span>📮 চিঠির ডাকপিয়ন:</span>
+            <span className="font-serif font-bold text-ink-800 hover:text-crimson-800 underline decoration-dotted">
+              জাহাঙ্গীর আলম তমাল
+            </span>
+          </a>
+          <span className="text-paper-300 hidden sm:inline">•</span>
+          <p className="flex items-center gap-1">
+            হৃদয় থেকে লেখা প্রতিটি চিঠির জন্য <Heart className="w-3.5 h-3.5 text-crimson-700 fill-crimson-700 inline" />
+          </p>
+        </div>
       </div>
     </footer>
   );
