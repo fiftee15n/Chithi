@@ -35,8 +35,6 @@ export default function ShareLetterModal({ letter, isOpen, onClose }: ShareLette
   const handleNativeShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: `চিঠি — প্রাপক: ${letter.recipient}`,
-        text: `“${letter.body.substring(0, 100)}...” — চিঠি প্ল্যাটফর্মে পড়ুন`,
         url: letterUrl,
       }).catch(() => {});
     }

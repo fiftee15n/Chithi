@@ -30,11 +30,20 @@ export const metadata: Metadata = {
     title: 'চিঠি — বলা হয়নি এমন কথার ঠিকানা',
     description: 'কিছু কথা নামহীন থাকলেই হয়তো বেশি সুন্দর। আপনার না-বলা দীর্ঘশ্বাস আর অনুভূতির গল্পগুলো নির্দ্বিধায় রেখে যান চিঠির ভাঁজে।',
     type: 'website',
+    images: [
+      {
+        url: '/api/og',
+        width: 1200,
+        height: 630,
+        alt: 'চিঠি — একটি Anonymous Bangla Letter Platform',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'চিঠি — বলা হয়নি এমন কথার ঠিকানা',
     description: 'কিছু কথা নামহীন থাকলেই হয়তো বেশি সুন্দর। আপনার না-বলা দীর্ঘশ্বাস আর অনুভূতির গল্পগুলো নির্দ্বিধায় রেখে যান চিঠির ভাঁজে।',
+    images: ['/api/og'],
   },
 };
 

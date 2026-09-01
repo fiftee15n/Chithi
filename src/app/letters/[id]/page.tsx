@@ -62,6 +62,8 @@ export async function generateMetadata({ params }: LetterPageProps): Promise<Met
   const dynamicTitle = `প্রাপক: ${letter.recipient} — চিঠি (${letter.category})`;
   const dynamicDescription = `“${shortSnippet}” — ইতি, ${letter.senderName}`;
 
+  const ogImageUrl = `/api/og/letter?id=${encodeURIComponent(resolved.id)}`;
+
   return {
     title: `${dynamicTitle} | চিঠি`,
     description: dynamicDescription,
@@ -70,11 +72,20 @@ export async function generateMetadata({ params }: LetterPageProps): Promise<Met
       description: dynamicDescription,
       type: 'article',
       siteName: 'চিঠি',
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: dynamicTitle,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title: dynamicTitle,
       description: dynamicDescription,
+      images: [ogImageUrl],
     },
   };
 }
